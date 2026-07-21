@@ -1,0 +1,54 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install System Dependencies & Autotools Fix
+      run: |
+        sudo apt-get update
+        # تثبيت الحزم الكاملة لضمان توفر كافة ماكروهات libtool و autoconf و gettext
+        sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev ncurses-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev wget gettext autopoint
+        pip install --upgrade buildozer virtualenv "Cython<3.0"
+
+    - name: Setup Android SDK and Symlinks
+      run: |
+        ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+        mkdir -p $ANDROID_HOME/cmdline-tools/latest
+        cd $ANDROID_HOME/cmdline-tools/latest
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+        unzip -q tools.zip
+        mv cmdline-tools/* . 2>/dev/null || true
+        rm -rf cmdline-tools tools.zip
+        
+        mkdir -p $ANDROID_HOME/tools/bin
+        ln -s $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager $ANDROID_HOME/tools/bin/sdkmanager
+
+        mkdir -p $ANDROID_HOME/licenses
+        echo -e "\n24333f8a53b689945f3595d2c2c01nd8" > $ANDROID_HOME/licenses/android-sdk-license
+        echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" >> $ANDROID_HOME/licenses/android-sdk-license
+        echo -e "\nd56f5187479451eabf01fb78af6dfcb131a648fa" >> $ANDROID_HOME/licenses/android-sdk-license
+
+    - name: Build APK with Buildozer
+      run: |
+        unset ANDROID_SDK_ROOT
+        unset ANDROID_NDK_ROOT
+        buildozer -v android debug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: phone-scanner-apk
+        path: bin/*.apk
