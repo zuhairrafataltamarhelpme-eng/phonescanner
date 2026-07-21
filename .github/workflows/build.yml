@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev ncurses-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+        pip install --upgrade buildozer cython virtualenv
+
+    - name: Initialize Buildozer & Configure Spec
+      run: |
+        buildozer init
+        sed -i 's/^title = .*/title = Phone Scanner AI/' buildozer.spec
+        sed -i 's/^package.name = .*/package.name = phonescanner/' buildozer.spec
+        sed -i 's/^package.domain = .*/package.domain = org.scanner/' buildozer.spec
+        sed -i 's/^requirements = .*/requirements = python3,kivy,android,pyjnius,requests,urllib3,charset-normalizer,idna,certifi/' buildozer.spec
+        sed -i 's/^#* *android.permissions = .*/android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE/' buildozer.spec
+        sed -i 's/^#* *android.api = .*/android.api = 33/' buildozer.spec
+        sed -i 's/^#* *android.minapi = .*/android.minapi = 21/' buildozer.spec
+
+    - name: Build APK with Buildozer
+      run: |
+        buildozer -v android debug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: phone-scanner-apk
+        path: bin/*.apk
